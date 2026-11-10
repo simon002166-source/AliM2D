@@ -338,7 +338,6 @@
           })
         ];
 
-
         tileLayers[0].on('tileerror', () => {
           if (currentLayerIndex === 0) switchBaseMap();
         });
@@ -415,7 +414,9 @@
       }
 
       // 5. 聚焦景點
+      // 點擊景點卡片時暫停自動置中，讓您安心看景點
       function focusStop(stop) {
+        followUser = false;
         if (map && markers[stop.id]) {
           map.flyTo([stop.lat, stop.lng], 16, { duration: 0.8 });
           markers[stop.id].openPopup();
@@ -499,8 +500,15 @@
       let userMarker = null;
       let userAccuracyCircle = null;
       let currentUserLatLng = null;
+      let followUser = true; // 預設開啟：取得 GPS 後自動置中並跟隨移動
       const gpsDot = document.getElementById('gps-status-dot');
       const gpsText = document.getElementById('gps-status-text');
+      // 當使用者手動拖曳地圖時，暫停自動置中，避免瀏覽景點時被拉回
+      if (map) {
+        map.on('dragstart', () => {
+          followUser = false;
+        });
+      }
 
       function startGPS() {
         if (!('geolocation' in navigator)) {
@@ -540,26 +548,30 @@
                 fillOpacity: 0.12,
                 weight: 1
               }).addTo(map);
+
+              // 首次取得座標時，立即將地圖置中到目前位置
+              map.setView(currentUserLatLng, 16);
             } else {
               userMarker.setLatLng(currentUserLatLng);
               userAccuracyCircle.setLatLng(currentUserLatLng).setRadius(accuracy);
+
+              // 若處於跟隨模式，座標更新時持續保持置中
+              if (followUser) {
+                map.panTo(currentUserLatLng, { animate: true });
+              }
             }
           },
           (err) => {
             gpsDot.className = 'w-2 h-2 rounded-full bg-rose-400';
-            if (err.code === 1) {
-              gpsText.textContent = '定位未授權';
-            } else if (err.code === 3) {
-              gpsText.textContent = '定位逾時';
-            } else {
-              gpsText.textContent = '無法定位';
-            }
+            gpsText.textContent = err.code === 1 ? '定位未授權' : (err.code === 3 ? '定位逾時' : '無法定位');
           },
-          { enableHighAccuracy: false, maximumAge: 10000, timeout: 10000 }
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
         );
       }
 
+      // 點擊右下角定位按鈕：恢復「目前位置持續置中」
       document.getElementById('btn-center-user').addEventListener('click', () => {
+        followUser = true;
         if (currentUserLatLng && map) {
           map.flyTo(currentUserLatLng, 16, { duration: 0.8 });
           if (userMarker) userMarker.openPopup();
