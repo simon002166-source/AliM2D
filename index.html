@@ -321,19 +321,23 @@
         map = L.map('map', { zoomControl: true }).setView([23.511, 120.808], 14);
 
         tileLayers = [
+          // 1. OpenStreetMap 標準街道圖（免費免 Key）
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap'
           }),
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          // 2. 台灣國土測繪中心（NLSC）通用版電子地圖（免費免 Key，台灣山區步道最詳細！）
+          L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: '&copy; CartoDB'
+            attribution: '&copy; 國土測繪中心'
           }),
-          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          // 3. Esri 衛星影像圖（免費免 Key，可看阿里山真實森林地形）
+          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: '&copy; Esri'
           })
         ];
+
 
         tileLayers[0].on('tileerror', () => {
           if (currentLayerIndex === 0) switchBaseMap();
