@@ -6,9 +6,9 @@
   <title>阿里山漫活二日遊｜互動地圖與導航</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet CSS & JS (改用穩定度更高的 cdnjs) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <style>
@@ -22,6 +22,14 @@
       height: 100%;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+    }
+
+    /* 強制確保地圖容器擁有明確尺寸 */
+    #map {
+      width: 100%;
+      height: 100%;
+      min-height: 250px;
+      background-color: #e5e7eb;
     }
 
     /* GPS 目前位置脈衝動畫 */
@@ -107,7 +115,15 @@
 
     <!-- 下半部（手機佔 1/2）：互動地圖區 -->
     <section id="map-panel" class="relative w-full md:flex-1 bg-slate-200 z-10 overflow-hidden">
-      <div id="map" class="w-full h-full"></div>
+      <div id="map"></div>
+
+      <!-- 圖資切換按鈕（若遇圖磚載入慢可一鍵切換備援底圖） -->
+      <div class="absolute top-3 right-3 z-[1000]">
+        <button onclick="switchBaseMap()" id="map-style-btn"
+          class="bg-white/95 hover:bg-white text-slate-700 border border-slate-300 shadow px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1">
+          <i class="fa-solid fa-layer-group text-[#1b5e36]"></i> <span>切換底圖</span>
+        </button>
+      </div>
 
       <!-- 右下角懸浮操作按鈕：定位到我 / 檢視全覽 -->
       <div class="absolute bottom-6 right-3 z-[1000] flex flex-col gap-2">
@@ -126,10 +142,9 @@
 
   <!-- 步道圖彈出檢視視窗 (Modal) -->
   <div id="trail-modal" onclick="closeTrailModal()"
-    class="fixed inset-0 z-[2000] bg-black/80 hidden flex-col items-center justify-center p-3 backdrop-blur-xs">
+    class="fixed inset-0 z-[2000] bg-black/80 hidden flex-col items-center justify-center p-3">
     <div onclick="event.stopPropagation()"
       class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200">
-      <!-- Modal 頂部列 -->
       <div class="bg-[#1b5e36] text-white px-4 py-2.5 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2 min-w-0">
           <i class="fa-solid fa-map-location-dot text-amber-300"></i>
@@ -141,364 +156,9 @@
         </button>
       </div>
 
-      <!-- 施工提醒橫幅 -->
       <div class="bg-amber-50 border-b border-amber-200 px-3.5 py-2 text-xs text-amber-900 flex items-start gap-2 shrink-0">
         <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>
         <span><b>施工提醒：</b>巨木群棧道(1) 於 115.1.19～116.5.31 施工封閉，建議改走<b>巨木群棧道(2)</b> 或經<b>慈雲觀景</b>方向前往香林神木。</span>
       </div>
 
-      <!-- 圖片捲動與雙指縮放區 -->
-      <div class="flex-1 overflow-auto bg-slate-100 p-2 flex items-center justify-center">
-        <img id="trail-map-img" src="trail_map.jpg" alt="阿里山森林遊樂區步道圖"
-          class="max-w-full h-auto rounded-lg shadow transition-transform duration-200 cursor-zoom-in"
-          onclick="toggleImageZoom(this)" />
-      </div>
-
-      <!-- Modal 底部操作列 -->
-      <div class="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between text-xs text-slate-600 shrink-0">
-        <span><i class="fa-solid fa-magnifying-glass-plus text-[#1b5e36] mr-1"></i>點擊圖片或雙指縮放可放大檢視</span>
-        <button onclick="closeTrailModal()"
-          class="px-4 py-1.5 rounded-lg bg-[#1b5e36] hover:bg-[#144929] text-white font-bold">
-          關閉地圖
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // 動態鎖定手機上下 50% 高度
-    function adjustMobileLayout() {
-      const container = document.getElementById('app-container');
-      const topPanel = document.getElementById('top-panel');
-      const mapPanel = document.getElementById('map-panel');
-      const vh = window.innerHeight;
-
-      container.style.height = vh + 'px';
-
-      if (window.innerWidth < 768) {
-        const half = Math.floor(vh / 2);
-        topPanel.style.height = half + 'px';
-        mapPanel.style.height = (vh - half) + 'px';
-      } else {
-        topPanel.style.height = vh + 'px';
-        mapPanel.style.height = vh + 'px';
-      }
-      if (window.map) {
-        window.map.invalidateSize();
-      }
-    }
-
-    // 1. 景點資料
-    const stops = [
-      {
-        id: 'kaohsiung',
-        day: 1,
-        time: '08:30 出發',
-        title: '高雄出發',
-        desc: '國道三號 ➔ 中埔交流道 ➔ 台18線阿里山公路，車程約 2.5-3 小時。',
-        lat: 22.6273,
-        lng: 120.3014,
-        color: '#1b5e36',
-        icon: 'fa-car'
-      },
-      {
-        id: 'fenqihu',
-        day: 1,
-        time: '11:30 - 13:30',
-        title: '奮起湖車站 / 老街午餐',
-        desc: '漫步百年老街、肖楠母樹林，品嚐美味奮起湖便當與愛玉子。',
-        lat: 23.5048,
-        lng: 120.6951,
-        color: '#d97706',
-        icon: 'fa-utensils'
-      },
-      {
-        id: 'entrance',
-        day: 1,
-        time: '14:30 - 15:30',
-        title: '阿里山國家森林遊樂區入口',
-        desc: '購票入園，並利用飯店接駁車或園區接駁前往深處飯店。',
-        lat: 23.5105,
-        lng: 120.8037,
-        color: '#1b5e36',
-        icon: 'fa-ticket'
-      },
-      {
-        id: 'hotel',
-        day: 1,
-        time: '15:30 - 18:00',
-        title: '阿里山閣大飯店（入住＆散步）',
-        desc: '辦理入住後步行漫遊沼平公園、空中棧道與姊妹潭，享受高山森林浴。',
-        lat: 23.5142,
-        lng: 120.8134,
-        color: '#dc2626',
-        icon: 'fa-bed'
-      },
-      {
-        id: 'giant-trees',
-        day: 2,
-        time: '09:30 - 11:00',
-        title: '巨木群棧道（香林神木）',
-        desc: '睡到自然醒並享用早餐後漫步千年神木群（棧道1施工中，請改走棧道2）。點此查看步道圖！',
-        lat: 23.5122,
-        lng: 120.8087,
-        color: '#2563eb',
-        icon: 'fa-tree',
-        hasTrailMap: true
-      },
-      {
-        id: 'post-office',
-        day: 2,
-        time: '11:00 - 12:30',
-        title: '阿里山郵局 ＆ 商圈午餐',
-        desc: '全台最高宮殿式郵局打卡，午餐後搭接駁車返回大門口開車賦歸。',
-        lat: 23.5113,
-        lng: 120.8065,
-        color: '#2563eb',
-        icon: 'fa-envelopes-bulk'
-      }
-    ];
-
-    adjustMobileLayout();
-
-    window.map = L.map('map', {
-      zoomControl: true
-    }).setView([23.511, 120.808], 14);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(window.map);
-
-    const markers = {};
-    const day1Coords = [];
-    const day2Coords = [];
-
-    stops.forEach(stop => {
-      if (stop.day === 1) day1Coords.push([stop.lat, stop.lng]);
-      if (stop.day === 2) day2Coords.push([stop.lat, stop.lng]);
-
-      const customIcon = L.divIcon({
-        className: 'custom-stop-marker',
-        html: `
-          <div style="background-color:${stop.color};" class="w-8 h-8 rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs">
-            <i class="fa-solid ${stop.icon}"></i>
-          </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16]
-      });
-
-      const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}`;
-      const trailBtnHtml = stop.hasTrailMap
-        ? `<button onclick="openTrailModal()" class="block w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-1.5 px-3 rounded shadow-sm mb-1.5">
-             <i class="fa-solid fa-map mr-1"></i> 查看園區步道圖
-           </button>`
-        : '';
-
-      const popupHtml = `
-        <div class="min-w-[200px] p-0.5">
-          <span class="inline-block px-2 py-0.5 text-[10px] font-bold text-white rounded mb-1" style="background:${stop.color}">
-            Day ${stop.day}｜${stop.time}
-          </span>
-          <h3 class="font-bold text-sm text-slate-900 mb-1">${stop.title}</h3>
-          <p class="text-xs text-slate-600 mb-2 leading-snug">${stop.desc}</p>
-          ${trailBtnHtml}
-          <a href="${navUrl}" target="_blank" rel="noopener noreferrer"
-             class="block w-full text-center bg-blue-600 hover:bg-blue-700 !text-white text-xs font-semibold py-1.5 px-3 rounded shadow-sm">
-            <i class="fa-solid fa-diamond-turn-right mr-1"></i> 開啟 Google 導航
-          </a>
-        </div>
-      `;
-
-      const marker = L.marker([stop.lat, stop.lng], { icon: customIcon })
-        .addTo(window.map)
-        .bindPopup(popupHtml);
-
-      // 點擊地圖上的香林神木標記時，同步彈出步道圖
-      if (stop.hasTrailMap) {
-        marker.on('click', () => {
-          openTrailModal();
-        });
-      }
-
-      markers[stop.id] = marker;
-    });
-
-    const day1Line = L.polyline(day1Coords, { color: '#1b5e36', weight: 4, opacity: 0.8, dashArray: '8, 6' }).addTo(window.map);
-    const day2Line = L.polyline([[23.5142, 120.8134], ...day2Coords], { color: '#2563eb', weight: 4, opacity: 0.8 }).addTo(window.map);
-
-    // 即時 GPS 座標更新
-    let userMarker = null;
-    let userAccuracyCircle = null;
-    let currentUserLatLng = null;
-
-    const gpsDot = document.getElementById('gps-status-dot');
-    const gpsText = document.getElementById('gps-status-text');
-
-    if ('geolocation' in navigator) {
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          currentUserLatLng = [latitude, longitude];
-
-          gpsDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
-          gpsText.textContent = `GPS (±${Math.round(accuracy)}m)`;
-
-          const gpsIcon = L.divIcon({
-            className: 'gps-location-icon',
-            html: `<div class="gps-pulse-wrapper"><div class="gps-pulse-ring"></div><div class="gps-dot"></div></div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14]
-          });
-
-          if (!userMarker) {
-            userMarker = L.marker(currentUserLatLng, { icon: gpsIcon, zIndexOffset: 1000 })
-              .addTo(window.map)
-              .bindPopup('<b>您的目前位置</b>');
-            userAccuracyCircle = L.circle(currentUserLatLng, {
-              radius: accuracy,
-              color: '#3b82f6',
-              fillColor: '#3b82f6',
-              fillOpacity: 0.12,
-              weight: 1
-            }).addTo(window.map);
-          } else {
-            userMarker.setLatLng(currentUserLatLng);
-            userAccuracyCircle.setLatLng(currentUserLatLng).setRadius(accuracy);
-          }
-        },
-        () => {
-          gpsDot.className = 'w-2 h-2 rounded-full bg-rose-400';
-          gpsText.textContent = '無 GPS 權限';
-        },
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-      );
-    }
-
-    function centerOnUser() {
-      if (currentUserLatLng) {
-        window.map.flyTo(currentUserLatLng, 16, { duration: 0.8 });
-        if (userMarker) userMarker.openPopup();
-      } else {
-        alert('尚未取得 GPS 座標，請確認手機已開啟定位權限。');
-      }
-    }
-
-    function fitAllMarkers() {
-      const group = L.featureGroup(Object.values(markers));
-      window.map.fitBounds(group.getBounds().pad(0.15));
-    }
-
-    function renderItinerary(dayFilter = 'all') {
-      const container = document.getElementById('itinerary-list');
-      container.innerHTML = '';
-
-      const filtered = dayFilter === 'all' ? stops : stops.filter(s => s.day === dayFilter);
-
-      filtered.forEach(stop => {
-        const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}`;
-        const borderClass = stop.day === 1 ? 'border-l-[#1b5e36]' : 'border-l-blue-600';
-        const pillClass = stop.day === 1 ? 'bg-emerald-50 text-[#1b5e36]' : 'bg-blue-50 text-blue-700';
-        const trailBadge = stop.hasTrailMap
-          ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 ml-1">
-               <i class="fa-solid fa-map"></i> 附步道圖
-             </span>`
-          : '';
-
-        const card = document.createElement('div');
-        card.className = `bg-white rounded-xl p-2.5 border border-slate-200 border-l-4 ${borderClass} shadow-sm cursor-pointer`;
-        card.innerHTML = `
-          <div class="flex items-center justify-between gap-2">
-            <div onclick="focusStop('${stop.id}')" class="flex-1 min-w-0">
-              <div class="flex items-center flex-wrap gap-1 mb-0.5">
-                <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded ${pillClass}">
-                  ${stop.time}
-                </span>
-                ${trailBadge}
-              </div>
-              <h3 class="font-bold text-slate-900 text-xs sm:text-sm truncate">${stop.title}</h3>
-              <p class="text-[11px] text-slate-600 mt-0.5 line-clamp-2 leading-snug">${stop.desc}</p>
-            </div>
-            <a href="${navUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
-              class="shrink-0 px-2.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm active:scale-95">
-              <i class="fa-solid fa-diamond-turn-right text-sm"></i>
-              <span class="text-[10px]">導航</span>
-            </a>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    function focusStop(id) {
-      const stop = stops.find(s => s.id === id);
-      if (!stop) return;
-      window.map.flyTo([stop.lat, stop.lng], 16, { duration: 0.8 });
-      markers[id].openPopup();
-      // 若為香林神木，自動彈出步道圖
-      if (stop.hasTrailMap) {
-        openTrailModal();
-      }
-    }
-
-    // 步道圖 Modal 控制
-    let isZoomed = false;
-    function openTrailModal() {
-      const modal = document.getElementById('trail-modal');
-      const img = document.getElementById('trail-map-img');
-      isZoomed = false;
-      img.style.width = '';
-      img.style.maxWidth = '100%';
-      img.classList.remove('cursor-zoom-out');
-      img.classList.add('cursor-zoom-in');
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-
-    function closeTrailModal() {
-      const modal = document.getElementById('trail-modal');
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-
-    function toggleImageZoom(img) {
-      isZoomed = !isZoomed;
-      if (isZoomed) {
-        img.style.maxWidth = 'none';
-        img.style.width = '180%';
-        img.classList.remove('cursor-zoom-in');
-        img.classList.add('cursor-zoom-out');
-      } else {
-        img.style.width = '';
-        img.style.maxWidth = '100%';
-        img.classList.remove('cursor-zoom-out');
-        img.classList.add('cursor-zoom-in');
-      }
-    }
-
-    function filterDay(day) {
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.className = 'tab-btn py-1 px-2 rounded-md text-xs font-bold bg-white text-slate-700 border border-slate-200 flex items-center justify-center gap-1';
-      });
-      const activeBtn = document.getElementById(`tab-${day}`);
-      activeBtn.className = 'tab-btn py-1 px-2 rounded-md text-xs font-bold bg-[#1b5e36] text-white shadow-sm flex items-center justify-center gap-1';
-
-      renderItinerary(day);
-
-      if (day === 1) {
-        window.map.fitBounds(day1Line.getBounds().pad(0.15));
-      } else if (day === 2) {
-        window.map.fitBounds(day2Line.getBounds().pad(0.25));
-      } else {
-        window.map.setView([23.512, 120.808], 15);
-      }
-    }
-
-    renderItinerary('all');
-    window.addEventListener('resize', adjustMobileLayout);
-    setTimeout(adjustMobileLayout, 300);
-  </script>
-</body>
-</html>
+      <div class="flex-1 overflow-auto bg-slate-1
