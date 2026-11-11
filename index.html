@@ -20,37 +20,30 @@
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
     }
+
+    /* 地圖容器平滑旋轉 */
     #map {
       width: 100%;
       height: 100%;
       background-color: #dbe4ea;
       z-index: 1;
+      transition: transform 0.4s ease-out;
+      transform-origin: 50% 50%;
     }
-    /* GPS 目前位置脈衝動畫 */
-    .gps-pulse-wrapper {
-      position: relative;
-      width: 24px;
-      height: 24px;
+
+    /* 導航方向箭頭 */
+    .nav-heading-icon {
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .gps-pulse-ring {
       position: absolute;
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       background-color: rgba(37, 99, 235, 0.35);
       animation: pulse-ring 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-    }
-    .gps-dot {
-      position: relative;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background-color: #2563eb;
-      border: 2.5px solid #ffffff;
-      box-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
     }
     @keyframes pulse-ring {
       0% { transform: scale(0.6); opacity: 0.9; }
@@ -62,10 +55,9 @@
 
   <div id="app-container" class="flex flex-col md:flex-row w-full h-full overflow-hidden">
 
-    <!-- 上半部（手機佔 1/2）：標題 ＋ 天數按鈕 ＋ 可捲動行程卡片 -->
+    <!-- 上半部（手機佔 1/2）：行程卡片區 -->
     <section id="top-panel" class="w-full md:w-[440px] lg:w-[480px] flex flex-col bg-white border-b-2 md:border-b-0 md:border-r border-slate-300 z-20 overflow-hidden">
-
-      <!-- 綠色主題頂部 Header -->
+      <!-- 標題列 -->
       <header class="bg-[#1b5e36] text-white px-3.5 py-2 shrink-0">
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 min-w-0">
@@ -77,7 +69,6 @@
               <p class="text-[10px] text-emerald-100/90 truncate">11/29 入住阿里山閣大飯店｜高雄出發（無日出版）</p>
             </div>
           </div>
-          <!-- GPS 狀態膠囊 -->
           <button id="btn-gps-status" type="button" class="flex items-center gap-1.5 text-[10px] bg-[#134627] px-2.5 py-1 rounded-full border border-emerald-600/50 shrink-0">
             <span id="gps-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
             <span id="gps-status-text">GPS定位中</span>
@@ -85,7 +76,7 @@
         </div>
       </header>
 
-      <!-- 天數切換按鈕列 -->
+      <!-- 天數切換按鈕 -->
       <div class="grid grid-cols-3 gap-1.5 px-2.5 py-1.5 bg-slate-100 border-b border-slate-200 shrink-0">
         <button type="button" data-day="all" id="tab-all"
           class="tab-btn py-1.5 px-2 rounded-md text-xs font-bold bg-[#1b5e36] text-white shadow-sm flex items-center justify-center gap-1">
@@ -101,7 +92,7 @@
         </button>
       </div>
 
-      <!-- 行程卡片捲動區 -->
+      <!-- 行程清單捲動區 -->
       <div id="itinerary-list" class="flex-1 overflow-y-auto px-2.5 py-2 space-y-2 bg-slate-50 min-h-0"></div>
     </section>
 
@@ -109,20 +100,27 @@
     <section id="map-panel" class="relative w-full md:flex-1 bg-slate-200 z-10 overflow-hidden">
       <div id="map"></div>
 
-      <!-- 圖資切換按鈕 -->
+      <!-- 切換底圖按鈕 -->
       <div class="absolute top-3 right-3 z-[1000]">
         <button type="button" id="btn-switch-map"
           class="bg-white/95 hover:bg-white text-slate-700 border border-slate-300 shadow px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1">
-          <i class="fa-solid fa-layer-group text-[#1b5e36]"></i> <span>切換底圖</span>
+          <i class="fa-solid fa-layer-group text-[#1b5e36]"></i> <span id="map-style-name">國土測繪圖</span>
         </button>
       </div>
 
-      <!-- 右下角懸浮操作按鈕：定位到我 / 檢視全覽 -->
+      <!-- 右下角懸浮按鈕：行進方向朝上 / 置中目前位置 / 全覽 -->
       <div class="absolute bottom-6 right-3 z-[1000] flex flex-col gap-2">
-        <button type="button" id="btn-center-user" title="定位到我的目前位置"
+        <!-- 切換行進方向朝上 -->
+        <button type="button" id="btn-toggle-heading" title="切換行進方向朝上"
+          class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-lg w-10 h-10 rounded-full flex items-center justify-center active:scale-95">
+          <i id="heading-icon-btn" class="fa-solid fa-compass text-base text-rose-500"></i>
+        </button>
+        <!-- 定位並置中 -->
+        <button type="button" id="btn-center-user" title="定位並置中我的位置"
           class="bg-white hover:bg-blue-50 text-blue-600 border border-slate-300 shadow-lg w-10 h-10 rounded-full flex items-center justify-center active:scale-95">
           <i class="fa-solid fa-location-crosshairs text-base"></i>
         </button>
+        <!-- 全覽行程 -->
         <button type="button" id="btn-fit-all" title="顯示完整行程範圍"
           class="bg-white hover:bg-emerald-50 text-[#1b5e36] border border-slate-300 shadow-lg w-10 h-10 rounded-full flex items-center justify-center active:scale-95">
           <i class="fa-solid fa-expand text-sm"></i>
@@ -132,7 +130,7 @@
 
   </div>
 
-  <!-- 步道圖彈出檢視視窗 (Modal) -->
+  <!-- 步道圖彈出視窗 -->
   <div id="trail-modal" class="fixed inset-0 z-[2000] bg-black/80 hidden flex-col items-center justify-center p-3">
     <div id="trail-modal-box" class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200">
       <div class="bg-[#1b5e36] text-white px-4 py-2.5 flex items-center justify-between shrink-0">
@@ -140,104 +138,58 @@
           <i class="fa-solid fa-map-location-dot text-amber-300"></i>
           <h2 class="text-sm font-bold truncate">阿里山國家森林遊樂區步道導覽圖</h2>
         </div>
-        <button type="button" id="btn-close-modal-top"
-          class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center">
+        <button type="button" id="btn-close-modal-top" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center">
           <i class="fa-solid fa-xmark text-base"></i>
         </button>
       </div>
-
       <div class="bg-amber-50 border-b border-amber-200 px-3.5 py-2 text-xs text-amber-900 flex items-start gap-2 shrink-0">
         <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>
-        <span><b>施工提醒：</b>巨木群棧道(1) 於 115.1.19～116.5.31 施工封閉，建議改走<b>巨木群棧道(2)</b> 或經<b>慈雲觀景</b>方向前往香林神木。</span>
+        <span><b>施工提醒：</b>巨木群棧道(1) 於 115.1.19～116.5.31 施工封閉，建議改走<b>巨木群棧道(2)</b> 或經<b>慈雲觀景</b>前往香林神木[cite: 3]。</span>
       </div>
-
       <div class="flex-1 overflow-auto bg-slate-100 p-2 flex items-center justify-center">
-        <img id="trail-map-img" src="trail_map.jpg" alt="阿里山森林遊樂區步道圖"
-          class="max-w-full h-auto rounded-lg shadow transition-transform duration-200 cursor-zoom-in" />
+        <img id="trail-map-img" src="trail_map.jpg" alt="阿里山步道圖" class="max-w-full h-auto rounded-lg shadow cursor-zoom-in" />
       </div>
-
       <div class="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between text-xs text-slate-600 shrink-0">
-        <span><i class="fa-solid fa-magnifying-glass-plus text-[#1b5e36] mr-1"></i>點擊圖片可放大檢視</span>
-        <button type="button" id="btn-close-modal-bottom"
-          class="px-4 py-1.5 rounded-lg bg-[#1b5e36] hover:bg-[#144929] text-white font-bold">
-          關閉地圖
-        </button>
+        <span><i class="fa-solid fa-magnifying-glass-plus text-[#1b5e36] mr-1"></i>點擊圖片可放大</span>
+        <button type="button" id="btn-close-modal-bottom" class="px-4 py-1.5 rounded-lg bg-[#1b5e36] hover:bg-[#144929] text-white font-bold">關閉地圖</button>
       </div>
     </div>
   </div>
 
-  <!-- Leaflet JS 放在 body 底部確保 DOM 已就緒 -->
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     (function () {
-      // 1. 景點資料
       const stops = [
         {
-          id: 'kaohsiung',
-          day: 1,
-          time: '08:30 出發',
-          title: '高雄出發',
+          id: 'kaohsiung', day: 1, time: '08:30 出發', title: '高雄出發',
           desc: '國道三號 ➔ 中埔交流道 ➔ 台18線阿里山公路，車程約 2.5-3 小時。',
-          lat: 22.6273,
-          lng: 120.3014,
-          color: '#1b5e36',
-          icon: 'fa-car'
+          lat: 22.6273, lng: 120.3014, color: '#1b5e36', icon: 'fa-car'
         },
         {
-          id: 'fenqihu',
-          day: 1,
-          time: '11:30 - 13:30',
-          title: '奮起湖車站 / 老街午餐',
+          id: 'fenqihu', day: 1, time: '11:30 - 13:30', title: '奮起湖車站 / 老街午餐',
           desc: '漫步百年老街、肖楠母樹林，品嚐美味奮起湖便當與愛玉子。',
-          lat: 23.5048,
-          lng: 120.6951,
-          color: '#d97706',
-          icon: 'fa-utensils'
+          lat: 23.5048, lng: 120.6951, color: '#d97706', icon: 'fa-utensils'
         },
         {
-          id: 'entrance',
-          day: 1,
-          time: '14:30 - 15:30',
-          title: '阿里山國家森林遊樂區入口',
+          id: 'entrance', day: 1, time: '14:30 - 15:30', title: '阿里山國家森林遊樂區入口',
           desc: '購票入園，並利用飯店接駁車或園區接駁前往深處飯店。',
-          lat: 23.5105,
-          lng: 120.8037,
-          color: '#1b5e36',
-          icon: 'fa-ticket'
+          lat: 23.5105, lng: 120.8037, color: '#1b5e36', icon: 'fa-ticket'
         },
         {
-          id: 'hotel',
-          day: 1,
-          time: '15:30 - 18:00',
-          title: '阿里山閣大飯店（入住＆散步）',
+          id: 'hotel', day: 1, time: '15:30 - 18:00', title: '阿里山閣大飯店（入住＆散步）',
           desc: '辦理入住後步行漫遊沼平公園、空中棧道與姊妹潭，享受高山森林浴。',
-          lat: 23.5142,
-          lng: 120.8134,
-          color: '#dc2626',
-          icon: 'fa-bed'
+          lat: 23.5142, lng: 120.8134, color: '#dc2626', icon: 'fa-bed'
         },
         {
-          id: 'giant-trees',
-          day: 2,
-          time: '09:30 - 11:00',
-          title: '巨木群棧道（香林神木）',
+          id: 'giant-trees', day: 2, time: '09:30 - 11:00', title: '巨木群棧道（香林神木）',
           desc: '睡到自然醒並享用早餐後漫步千年神木群（棧道1施工中，請改走棧道2）。點此查看步道圖！',
-          lat: 23.5122,
-          lng: 120.8087,
-          color: '#2563eb',
-          icon: 'fa-tree',
-          hasTrailMap: true
+          lat: 23.5122, lng: 120.8087, color: '#2563eb', icon: 'fa-tree', hasTrailMap: true
         },
         {
-          id: 'post-office',
-          day: 2,
-          time: '11:00 - 12:30',
-          title: '阿里山郵局 ＆ 商圈午餐',
+          id: 'post-office', day: 2, time: '11:00 - 12:30', title: '阿里山郵局 ＆ 商圈午餐',
           desc: '全台最高宮殿式郵局打卡，午餐後搭接駁車返回大門口開車賦歸。',
-          lat: 23.5113,
-          lng: 120.8065,
-          color: '#2563eb',
-          icon: 'fa-envelopes-bulk'
+          lat: 23.5113, lng: 120.8065, color: '#2563eb', icon: 'fa-envelopes-bulk'
         }
       ];
 
@@ -247,14 +199,14 @@
       let day2Line = null;
       let currentLayerIndex = 0;
       let tileLayers = [];
+      const layerNames = ['國土測繪圖', 'OSM 街道圖', 'Esri 衛星影像'];
 
-      // 2. 調整手機版上下各 50% 高度
+      // 手機上下 50% 高度調整
       function adjustLayout() {
         const container = document.getElementById('app-container');
         const topPanel = document.getElementById('top-panel');
         const mapPanel = document.getElementById('map-panel');
         const vh = window.innerHeight || document.documentElement.clientHeight;
-
         container.style.height = vh + 'px';
 
         if (window.innerWidth < 768) {
@@ -265,82 +217,52 @@
           topPanel.style.height = vh + 'px';
           mapPanel.style.height = vh + 'px';
         }
-
-        if (map) {
-          map.invalidateSize(true);
-        }
+        if (map) map.invalidateSize(true);
       }
 
-      // 3. 步道圖 Modal 控制
+      // 步道圖 Modal
       const trailModal = document.getElementById('trail-modal');
       const trailImg = document.getElementById('trail-map-img');
       let isZoomed = false;
-
       function openTrailModal() {
         isZoomed = false;
         trailImg.style.width = '';
         trailImg.style.maxWidth = '100%';
-        trailImg.classList.remove('cursor-zoom-out');
-        trailImg.classList.add('cursor-zoom-in');
         trailModal.classList.remove('hidden');
         trailModal.classList.add('flex');
       }
-
       function closeTrailModal() {
         trailModal.classList.add('hidden');
         trailModal.classList.remove('flex');
       }
-
       trailModal.addEventListener('click', closeTrailModal);
       document.getElementById('trail-modal-box').addEventListener('click', (e) => e.stopPropagation());
       document.getElementById('btn-close-modal-top').addEventListener('click', closeTrailModal);
       document.getElementById('btn-close-modal-bottom').addEventListener('click', closeTrailModal);
       trailImg.addEventListener('click', () => {
         isZoomed = !isZoomed;
-        if (isZoomed) {
-          trailImg.style.maxWidth = 'none';
-          trailImg.style.width = '180%';
-          trailImg.classList.remove('cursor-zoom-in');
-          trailImg.classList.add('cursor-zoom-out');
-        } else {
-          trailImg.style.width = '';
-          trailImg.style.maxWidth = '100%';
-          trailImg.classList.remove('cursor-zoom-out');
-          trailImg.classList.add('cursor-zoom-in');
-        }
+        trailImg.style.maxWidth = isZoomed ? 'none' : '100%';
+        trailImg.style.width = isZoomed ? '180%' : '';
       });
 
-      // 4. 初始化地圖函數
+      // 初始化地圖（完全使用免費免 Key 底圖）
       function initMap() {
-        if (typeof L === 'undefined') {
-          document.getElementById('map').innerHTML =
-            '<div class="flex items-center justify-center h-full p-4 text-center text-sm text-slate-600">正在重新載入地圖元件...</div>';
-          return;
-        }
-
         map = L.map('map', { zoomControl: true }).setView([23.511, 120.808], 14);
 
         tileLayers = [
-          // 1. OpenStreetMap 標準街道圖（免費免 Key）
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-          }),
-          // 2. 台灣國土測繪中心（NLSC）通用版電子地圖（免費免 Key，台灣山區步道最詳細！）
+          // 1. 台灣國土測繪中心通用版電子地圖（台灣山區最清楚、免費免 Key）
           L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: '&copy; 國土測繪中心'
+            maxZoom: 19, attribution: '&copy; 國土測繪中心'
           }),
-          // 3. Esri 衛星影像圖（免費免 Key，可看阿里山真實森林地形）
+          // 2. OpenStreetMap（免費免 Key）
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '&copy; OpenStreetMap'
+          }),
+          // 3. Esri 衛星實景（免費免 Key）
           L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            attribution: '&copy; Esri'
+            maxZoom: 19, attribution: '&copy; Esri'
           })
         ];
-
-        tileLayers[0].on('tileerror', () => {
-          if (currentLayerIndex === 0) switchBaseMap();
-        });
 
         tileLayers[0].addTo(map);
 
@@ -354,14 +276,10 @@
           const customIcon = L.divIcon({
             className: 'custom-stop-marker',
             html: `<div style="background-color:${stop.color};" class="w-8 h-8 rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs"><i class="fa-solid ${stop.icon}"></i></div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-            popupAnchor: [0, -16]
+            iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16]
           });
 
           const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}`;
-
-          // 使用 DOM 元素建立 Popup 內容，避免任何內聯事件衝突
           const popupDiv = document.createElement('div');
           popupDiv.className = 'min-w-[200px] p-0.5';
           popupDiv.innerHTML = `
@@ -396,14 +314,16 @@
           if (stop.hasTrailMap) {
             marker.on('click', openTrailModal);
           }
-
           markers[stop.id] = marker;
         });
 
         day1Line = L.polyline(day1Coords, { color: '#1b5e36', weight: 4, opacity: 0.8, dashArray: '8, 6' }).addTo(map);
         day2Line = L.polyline([[23.5142, 120.8134], ...day2Coords], { color: '#2563eb', weight: 4, opacity: 0.8 }).addTo(map);
 
-        setTimeout(() => map.invalidateSize(true), 200);
+        // 手動拖曳地圖時暫停自動跟隨
+        map.on('dragstart', () => {
+          followUser = false;
+        });
       }
 
       function switchBaseMap() {
@@ -411,10 +331,10 @@
         map.removeLayer(tileLayers[currentLayerIndex]);
         currentLayerIndex = (currentLayerIndex + 1) % tileLayers.length;
         tileLayers[currentLayerIndex].addTo(map);
+        document.getElementById('map-style-name').textContent = layerNames[currentLayerIndex];
       }
+      document.getElementById('btn-switch-map').addEventListener('click', switchBaseMap);
 
-      // 5. 聚焦景點
-      // 點擊景點卡片時暫停自動置中，讓您安心看景點
       function focusStop(stop) {
         followUser = false;
         if (map && markers[stop.id]) {
@@ -426,11 +346,9 @@
         }
       }
 
-      // 6. 渲染行程列表（使用純 DOM 事件綁定）
       function renderItinerary(dayFilter) {
         const container = document.getElementById('itinerary-list');
         container.innerHTML = '';
-
         const filtered = dayFilter === 'all' ? stops : stops.filter(s => String(s.day) === String(dayFilter));
 
         filtered.forEach(stop => {
@@ -466,7 +384,6 @@
           navBtn.addEventListener('click', (e) => e.stopPropagation());
 
           card.addEventListener('click', () => focusStop(stop));
-
           row.appendChild(infoBox);
           row.appendChild(navBtn);
           card.appendChild(row);
@@ -474,7 +391,6 @@
         });
       }
 
-      // 7. 分頁切換
       document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const day = btn.getAttribute('data-day');
@@ -484,30 +400,45 @@
           btn.className = 'tab-btn py-1.5 px-2 rounded-md text-xs font-bold bg-[#1b5e36] text-white shadow-sm flex items-center justify-center gap-1';
 
           renderItinerary(day);
-
           if (!map) return;
-          if (day === '1' && day1Line) {
-            map.fitBounds(day1Line.getBounds().pad(0.15));
-          } else if (day === '2' && day2Line) {
-            map.fitBounds(day2Line.getBounds().pad(0.25));
-          } else {
-            map.setView([23.512, 120.808], 15);
-          }
+          if (day === '1' && day1Line) map.fitBounds(day1Line.getBounds().pad(0.15));
+          else if (day === '2' && day2Line) map.fitBounds(day2Line.getBounds().pad(0.25));
+          else map.setView([23.512, 120.808], 15);
         });
       });
 
-      // 8. GPS 定位追蹤（獨立運作，不影響地圖與點擊）
+      // ==========================================
+      // GPS 與行進朝上（Heading Up）控制核心區
+      // ==========================================
       let userMarker = null;
       let userAccuracyCircle = null;
       let currentUserLatLng = null;
-      let followUser = true; // 預設開啟：取得 GPS 後自動置中並跟隨移動
+      let followUser = true;        // 是否持續保持置中
+      let isHeadingUp = false;      // 是否切換為「行進方向朝上」
+      let currentHeading = 0;       // 目前方向角度
+      let lastLatLng = null;        // 前一個座標（輔助計算航向）
+
       const gpsDot = document.getElementById('gps-status-dot');
       const gpsText = document.getElementById('gps-status-text');
-      // 當使用者手動拖曳地圖時，暫停自動置中，避免瀏覽景點時被拉回
-      if (map) {
-        map.on('dragstart', () => {
-          followUser = false;
-        });
+
+      function calculateHeading(lat1, lon1, lat2, lon2) {
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+        const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                  Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+        return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+      }
+
+      function updateMapRotation(heading) {
+        const mapEl = document.getElementById('map');
+        const compassBtnIcon = document.getElementById('heading-icon-btn');
+        if (isHeadingUp && heading !== null && heading !== undefined) {
+          mapEl.style.transform = `rotate(${-heading}deg) scale(1.3)`;
+          if (compassBtnIcon) compassBtnIcon.style.transform = `rotate(${heading}deg)`;
+        } else {
+          mapEl.style.transform = 'rotate(0deg) scale(1)';
+          if (compassBtnIcon) compassBtnIcon.style.transform = 'rotate(0deg)';
+        }
       }
 
       function startGPS() {
@@ -522,86 +453,118 @@
 
         navigator.geolocation.watchPosition(
           (pos) => {
-            const { latitude, longitude, accuracy } = pos.coords;
+            const { latitude, longitude, accuracy, heading } = pos.coords;
             currentUserLatLng = [latitude, longitude];
 
             gpsDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
             gpsText.textContent = `GPS (±${Math.round(accuracy)}m)`;
 
-            if (!map || typeof L === 'undefined') return;
+            if (!map) return;
 
-            const gpsIcon = L.divIcon({
-              className: 'gps-location-icon',
-              html: '<div class="gps-pulse-wrapper"><div class="gps-pulse-ring"></div><div class="gps-dot"></div></div>',
-              iconSize: [28, 28],
-              iconAnchor: [14, 14]
+            // 判斷航向
+            if (heading !== null && !isNaN(heading)) {
+              currentHeading = heading;
+            } else if (lastLatLng) {
+              const dist = map.distance(lastLatLng, currentUserLatLng);
+              if (dist > 3) {
+                currentHeading = calculateHeading(lastLatLng[0], lastLatLng[1], latitude, longitude);
+              }
+            }
+            lastLatLng = currentUserLatLng;
+
+            // 導航箭頭 Icon
+            const navIcon = L.divIcon({
+              className: 'nav-heading-icon',
+              html: `
+                <div style="transform: rotate(${isHeadingUp ? 0 : currentHeading}deg);" class="relative flex items-center justify-center">
+                  <div class="gps-pulse-ring"></div>
+                  <div class="w-7 h-7 bg-blue-600 rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs">
+                    <i class="fa-solid fa-location-arrow -rotate-45"></i>
+                  </div>
+                </div>
+              `,
+              iconSize: [30, 30],
+              iconAnchor: [15, 15]
             });
 
             if (!userMarker) {
-              userMarker = L.marker(currentUserLatLng, { icon: gpsIcon, zIndexOffset: 1000 })
+              userMarker = L.marker(currentUserLatLng, { icon: navIcon, zIndexOffset: 1000 })
                 .addTo(map)
                 .bindPopup('<b>您的目前位置</b>');
               userAccuracyCircle = L.circle(currentUserLatLng, {
-                radius: accuracy,
-                color: '#3b82f6',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.12,
-                weight: 1
+                radius: accuracy, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.12, weight: 1
               }).addTo(map);
 
-              // 首次取得座標時，立即將地圖置中到目前位置
+              // 第一次取得座標時直接置中
               map.setView(currentUserLatLng, 16);
             } else {
               userMarker.setLatLng(currentUserLatLng);
+              userMarker.setIcon(navIcon);
               userAccuracyCircle.setLatLng(currentUserLatLng).setRadius(accuracy);
 
-              // 若處於跟隨模式，座標更新時持續保持置中
+              // 若開啟跟隨，自動 panTo 持續置中
               if (followUser) {
                 map.panTo(currentUserLatLng, { animate: true });
               }
             }
+
+            updateMapRotation(currentHeading);
           },
           (err) => {
             gpsDot.className = 'w-2 h-2 rounded-full bg-rose-400';
-            gpsText.textContent = err.code === 1 ? '定位未授權' : (err.code === 3 ? '定位逾時' : '無法定位');
+            gpsText.textContent = err.code === 1 ? '未授權' : '定位失敗';
           },
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+          { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
         );
       }
 
-      // 點擊右下角定位按鈕：恢復「目前位置持續置中」
+      // 按鈕：切換行進方向朝上
+      document.getElementById('btn-toggle-heading').addEventListener('click', () => {
+        isHeadingUp = !isHeadingUp;
+        followUser = true;
+
+        const btn = document.getElementById('btn-toggle-heading');
+        const icon = document.getElementById('heading-icon-btn');
+
+        if (isHeadingUp) {
+          btn.classList.add('bg-blue-50', 'border-blue-400');
+          icon.className = 'fa-solid fa-location-arrow text-blue-600';
+        } else {
+          btn.classList.remove('bg-blue-50', 'border-blue-400');
+          icon.className = 'fa-solid fa-compass text-rose-500';
+        }
+
+        updateMapRotation(currentHeading);
+        if (currentUserLatLng && map) map.panTo(currentUserLatLng);
+      });
+
+      // 按鈕：置中到我的目前位置
       document.getElementById('btn-center-user').addEventListener('click', () => {
         followUser = true;
         if (currentUserLatLng && map) {
           map.flyTo(currentUserLatLng, 16, { duration: 0.8 });
           if (userMarker) userMarker.openPopup();
         } else {
-          alert('尚未取得 GPS 座標，請確認手機已開啟「位置資訊」並允許瀏覽器存取。');
+          alert('尚未取得 GPS 座標，請確認手機已開啟定位並允許存取。');
           startGPS();
         }
       });
 
       document.getElementById('btn-gps-status').addEventListener('click', startGPS);
-
       document.getElementById('btn-fit-all').addEventListener('click', () => {
+        followUser = false;
         if (!map) return;
         const group = L.featureGroup(Object.values(markers));
         map.fitBounds(group.getBounds().pad(0.15));
       });
 
-      document.getElementById('btn-switch-map').addEventListener('click', switchBaseMap);
-
-      // 9. 啟動程序
+      // 啟動
       adjustLayout();
       renderItinerary('all');
       initMap();
       startGPS();
 
       window.addEventListener('resize', adjustLayout);
-      window.addEventListener('load', () => {
-        adjustLayout();
-        if (!map && typeof L !== 'undefined') initMap();
-      });
     })();
   </script>
 </body>
